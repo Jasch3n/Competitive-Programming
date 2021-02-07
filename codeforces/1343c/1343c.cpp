@@ -1,12 +1,15 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <vector>
 
 using namespace std;
 
 int calcLength(int* A, int* memLen, int index, int n);
 long long int calcSum(int* A, long long int* memSum, int index, int n);
-int findNextAltIndex(int* A, int size, int index);
+vector<int> findAllAltIndex(int* A, int size, int index);
+long long int solve(int* A, long long int** dp, int n, int index, int k, bool** initialized, int* memLen);
+long long int arbitraryMax(vector<long long int> nums);
 
 int main()
 {
@@ -29,60 +32,88 @@ int main()
             if (currLength>k) k=currLength;
         }
 
+        // cout << "MAX LENGTH = " << k << endl;
+        long long int** dp = new long long int*[n]; 
+        for (int j=0;j<n;j++) dp[j] = new long long int[k+1];
 
-        long long int** dpSum = new long long int*[n];
-        for (int j=0;j<n;j++) dpSum[j] = new long long int[k+1];
+        bool** initialized = new bool*[n]; 
+        for (int j=0;j<n;j++) initialized[j] = new bool[k+1];
+        for (int j=0;j<n;j++) { for (int jj=0;jj<k+1;jj++) { initialized[j][jj]=false; } }
 
-        bool** lastSign = new bool*[n];
-        for (int j=0;j<n;j++) lastSign[j] = new bool[k+1];
-
-        // initialize the first two columns of dpSum
-        for (int j=0; j<n; j++) dpSum[j][0]=0;
-        for (int j=0; j<n; j++) { dpSum[j][1]=A[j]; lastSign[j][1]=A[j]>0; }
         
-        for (int y=2; y<k+1; y++) {
-            for (int x=0; x<n-1; x++) {
-                if (x+1 >= y){
-                    if (A[x+1] > 0 != lastSign[x][y-1]) {
-                        dpSum[x+1][y]=0;
-                    }
-                    else {
-                        dpSum[x+1][y]=A[x+1];
-                    }
-                    lastSign[x+1][y]=A[x+1]>0;  
-
-                } else dpSum[x][y]=0;
+        long long int currMaxSum; bool currMaxSumFound=false;
+        for (int j=0; j<n; j++) {
+            if (memLen[j]==k) {
+                // cout << "CANDIDATE: " << A[j] <<endl;
+                long long int thisMaxSum=solve(A,dp,n,j,k,initialized,memLen);
+                if (!currMaxSumFound || thisMaxSum>currMaxSum) { currMaxSum=thisMaxSum; currMaxSumFound=true; }
             }
         }
-
-        for (int x=0; x<n; x++) {
-            for (int y=0; y<k+1; y++) {
-                cout << dpSum[x][y] << " ";
-            }
-            cout<<endl;
-        }
-
+        answers[i]=currMaxSum;
+        // vector<long long int> testVect; testVect.push_back(210); testVect.push_back(-12); testVect.push_back(410);
+        // cout << arbitraryMax(testVect) << endl;
     }
 
-    // for(int i=0; i<t; i++) cout<<answers[i]<<" ";
+    for(int i=0; i<t; i++) cout<<answers[i]<<endl;
 }
 
-int findNextAltIndex(int* A, int size, int index) {
+vector<int> findAllAltIndex(int* A, int size, int index) {
+    vector<int> indices;
     for(int i=index; i<size; i++) {
-        if ((A[index]>0 && A[i]<0) || (A[index]<0 && A[i]>0)) 
-            return i;
+        if (A[index]>0 != A[i]>0) 
+            indices.push_back(i);
     }
-    return -1;
+    return indices;
 }
 
 int calcLength(int* A, int* memLen, int index, int n) {
-    int nextIndex=findNextAltIndex(A,n,index);
-    if (nextIndex == -1) memLen[index]=1; // no next alternating element is found
+    vector<int> nextIndices=findAllAltIndex(A,n,index);
+    if (nextIndices.empty()) memLen[index]=1; // no next alternating element is found
     else if (memLen[index]!=0) return memLen[index]; // memoization already initialized
     // 1 + solution to subproblem. assuming a subproblem still exists
-    else memLen[index]=1+calcLength(A, memLen, nextIndex, n);
+    else memLen[index]=1+calcLength(A, memLen, nextIndices.front(), n);
     // cout<<"NEXT ALT INDEX: "<<nextIndex<<endl;
     // for (int ii=0; ii<n; ii++) cout << memLen[ii] << " "; cout<<endl;
     return memLen[index];
 
 }
+
+long long int solve(int* A, long long int** dp, int n, int index, int k, bool** initialized, int* memLen) {
+    if (k==0) {
+        dp[index][k]=0;
+        // initialized[index][k]=true;
+         return 0;
+    }
+    else if(initialized[index][k]) return dp[index][k];
+    else {
+        // cout <<"RECURRED: K=" <<k << endl; 
+        try {
+            vector<long long int> prevValues;
+            for(int i=index; i<n; i++) {
+                if (((A[index]>0) != (A[i]>0)) && (memLen[i]==k-1)) {
+                    // cout <<"PRE-RECURRENCE MESSAGE: K=" <<k << endl; 
+                    prevValues.push_back(solve(A, dp, n, i, k-1, initialized, memLen));
+                }
+            }
+            // cout <<"PRE-SETTING DP MESSAGE: K=" <<k << endl; 
+            dp[index][k] = A[index] + arbitraryMax(prevValues);
+            // cout <<"PRE-SETTING INITIALIZED MESSAGE: K=" <<k << endl; 
+            initialized[index][k]=true;
+            return dp[index][k];
+        } catch( const std::exception & ex ) {
+            cerr << ex.what() << endl;
+            throw;
+        }
+    }
+}
+
+long long int arbitraryMax(vector<long long int> nums) {
+    if (nums.empty()) return 0;
+    long long int max = *nums.begin();
+    for(auto it:nums){
+        if(it > max) max = it;
+    }
+    return max;
+}
+
+
